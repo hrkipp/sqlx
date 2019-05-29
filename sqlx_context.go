@@ -158,7 +158,7 @@ func (db *DB) PreparexContext(ctx context.Context, query string) (*Stmt, error) 
 // QueryxContext queries the database and returns an *sqlx.Rows.
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) QueryxContext(ctx context.Context, query string, args ...interface{}) (*Rows, error) {
-	r, err := db.DB.QueryContext(ctx, query, args...)
+	r, err := db.SqlDB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func (db *DB) QueryxContext(ctx context.Context, query string, args ...interface
 // QueryRowxContext queries the database and returns an *sqlx.Row.
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) QueryRowxContext(ctx context.Context, query string, args ...interface{}) *Row {
-	rows, err := db.DB.QueryContext(ctx, query, args...)
+	rows, err := db.SqlDB.QueryContext(ctx, query, args...)
 	return &Row{rows: rows, err: err, unsafe: db.unsafe, Mapper: db.Mapper}
 }
 
@@ -201,7 +201,7 @@ func (db *DB) MustExecContext(ctx context.Context, query string, args ...interfa
 // transaction. Tx.Commit will return an error if the context provided to
 // BeginxContext is canceled.
 func (db *DB) BeginTxx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
-	tx, err := db.DB.BeginTx(ctx, opts)
+	tx, err := db.SqlDB.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}

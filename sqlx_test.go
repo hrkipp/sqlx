@@ -23,7 +23,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jmoiron/sqlx/reflectx"
+	"github.com/hrkipp/sqlx/reflectx"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -1206,7 +1206,7 @@ func TestUsage(t *testing.T) {
 
 		// create a copy and change the mapper, then verify the copy behaves
 		// differently from the original.
-		dbCopy := NewDb(db.DB, db.DriverName())
+		dbCopy := NewDb(db.SqlDB, db.DriverName())
 		dbCopy.MapperFunc(strings.ToUpper)
 		err = dbCopy.Get(&rsa, "SELECT * FROM capplace;")
 		if err != nil {

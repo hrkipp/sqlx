@@ -1,10 +1,12 @@
 package sqlx
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"time"
 
 	"io/ioutil"
 	"path/filepath"
@@ -12,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jmoiron/sqlx/reflectx"
+	"github.com/hrkipp/sqlx/reflectx"
 )
 
 // Although the NameMapper is convenient, in practice it should not
@@ -241,10 +243,32 @@ func (r *Row) Err() error {
 	return r.err
 }
 
+type SqlDB interface {
+	Begin() (*sql.Tx, error)
+	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
+	Close() error
+	Conn(ctx context.Context) (*sql.Conn, error)
+	Driver() driver.Driver
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	Ping() error
+	PingContext(ctx context.Context) error
+	Prepare(query string) (*sql.Stmt, error)
+	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+	SetConnMaxLifetime(d time.Duration)
+	SetMaxIdleConns(n int)
+	SetMaxOpenConns(n int)
+	Stats() sql.DBStats
+}
+
 // DB is a wrapper around sql.DB which keeps track of the driverName upon Open,
 // used mostly to automatically bind named queries using the right bindvars.
 type DB struct {
-	*sql.DB
+	SqlDB
 	driverName string
 	unsafe     bool
 	Mapper     *reflectx.Mapper
@@ -252,8 +276,8 @@ type DB struct {
 
 // NewDb returns a new sqlx DB wrapper for a pre-existing *sql.DB.  The
 // driverName of the original database is required for named query support.
-func NewDb(db *sql.DB, driverName string) *DB {
-	return &DB{DB: db, driverName: driverName, Mapper: mapper()}
+func NewDb(db SqlDB, driverName string) *DB {
+	return &DB{SqlDB: db, driverName: driverName, Mapper: mapper()}
 }
 
 // DriverName returns the driverName passed to the Open function for this DB.
@@ -267,7 +291,7 @@ func Open(driverName, dataSourceName string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DB{DB: db, driverName: driverName, Mapper: mapper()}, err
+	return &DB{SqlDB: db, driverName: driverName, Mapper: mapper()}, err
 }
 
 // MustOpen is the same as sql.Open, but returns an *sqlx.DB instead and panics on error.
@@ -295,7 +319,7 @@ func (db *DB) Rebind(query string) string {
 // sqlx.Stmt and sqlx.Tx which are created from this DB will inherit its
 // safety behavior.
 func (db *DB) Unsafe() *DB {
-	return &DB{DB: db.DB, driverName: db.driverName, unsafe: true, Mapper: db.Mapper}
+	return &DB{SqlDB: db.SqlDB, driverName: db.driverName, unsafe: true, Mapper: db.Mapper}
 }
 
 // BindNamed binds a query using the DB driver's bindvar type.
@@ -340,7 +364,7 @@ func (db *DB) MustBegin() *Tx {
 
 // Beginx begins a transaction and returns an *sqlx.Tx instead of an *sql.Tx.
 func (db *DB) Beginx() (*Tx, error) {
-	tx, err := db.DB.Begin()
+	tx, err := db.SqlDB.Begin()
 	if err != nil {
 		return nil, err
 	}
@@ -350,7 +374,7 @@ func (db *DB) Beginx() (*Tx, error) {
 // Queryx queries the database and returns an *sqlx.Rows.
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
-	r, err := db.DB.Query(query, args...)
+	r, err := db.SqlDB.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +384,7 @@ func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
 // QueryRowx queries the database and returns an *sqlx.Row.
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) QueryRowx(query string, args ...interface{}) *Row {
-	rows, err := db.DB.Query(query, args...)
+	rows, err := db.SqlDB.Query(query, args...)
 	return &Row{rows: rows, err: err, unsafe: db.unsafe, Mapper: db.Mapper}
 }
 
